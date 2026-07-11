@@ -7,6 +7,14 @@ from app.core.db import db
 from app.models.content_model import build_content_doc
 from app.services.text_processing import chunk_text
 import io
+from openai import OpenAI
+import os
+import tempfile
+
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
+
+
+
 
 router = APIRouter(prefix="/content", tags=["content"])
 
@@ -71,3 +79,78 @@ def list_content(user=Depends(get_current_user)):
     for item in items:
         item["_id"] = str(item["_id"])
     return items
+
+
+
+from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
+import re
+
+
+def extract_youtube_id(url: str) -> str:
+    match = re.search(r"(?:v=|youtu\.be/|embed/)([A-Za-z0-9_-]{11})", url)
+    if not match:
+        raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+    return match.group(1)
+
+
+@router.post("/from-youtube")
+def from_youtube(url: str = Form(...), user=Depends(get_current_user)):
+    video_id = extract_youtube_id(url)
+    try:
+        api = YouTubeTranscriptApi()
+        transcript_list = api.fetch(video_id).to_raw_data()
+    except TranscriptsDisabled:
+        raise HTTPException(status_code=422, detail="Transcripts are disabled for this video")
+    except NoTranscriptFound:
+        raise HTTPException(status_code=422, detail="No transcript available for this video")
+    except Exception as e:
+        print("YOUTUBE ERROR:", repr(e))
+        raise HTTPException(status_code=422, detail="Could not fetch YouTube transcript")
+
+    raw_text = " ".join([seg["text"] for seg in transcript_list])
+    if not raw_text.strip():
+        raise HTTPException(status_code=422, detail="Transcript was empty")
+
+    chunks = chunk_text(raw_text)
+    doc = build_content_doc(user["uid"], "youtube", url, chunks, source=url)
+    result = db.content.insert_one(doc)
+    return {"content_id": str(result.inserted_id), "chunk_count": len(chunks)}
+
+
+
+
+
+
+
+@router.post("/upload-video")
+async def upload_video(file: UploadFile = File(...), user=Depends(get_current_user)):
+    if not openai_client:
+        raise HTTPException(status_code=503, detail="Video transcription is not configured yet")
+
+    allowed_types = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/webm"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Unsupported video format")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        with open(tmp_path, "rb") as audio_file:
+            transcript = openai_client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file
+            )
+    except Exception:
+        raise HTTPException(status_code=422, detail="Could not transcribe video")
+    finally:
+        os.remove(tmp_path)
+
+    raw_text = transcript.text
+    if not raw_text.strip():
+        raise HTTPException(status_code=422, detail="Transcription was empty")
+
+    chunks = chunk_text(raw_text)
+    doc = build_content_doc(user["uid"], "video", file.filename, chunks, source=file.filename)
+    result = db.content.insert_one(doc)
+    return {"content_id": str(result.inserted_id), "chunk_count": len(chunks)}

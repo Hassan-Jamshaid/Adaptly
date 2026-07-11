@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "../firebase/config";
+import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { refreshProfile } = useAuth();
   const [mode, setMode] = useState("learner");
   const [role, setRole] = useState("employee");
   const [email, setEmail] = useState("");
@@ -25,6 +27,7 @@ export default function Register() {
       {},
       { headers: { Authorization: `Bearer ${token}` } }
     );
+    await refreshProfile();
   };
 
   const handleRegister = async (e) => {
@@ -39,7 +42,7 @@ export default function Register() {
     }
   };
 
-  const handleGoogleSignup = async () => {
+  const handleGoogleSignup = async (e) => {
     setError("");
     try {
       await signInWithPopup(auth, googleProvider);

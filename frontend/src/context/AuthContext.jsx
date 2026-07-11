@@ -10,19 +10,23 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchProfile = async (user) => {
+    try {
+      const token = await user.getIdToken();
+      const res = await axios.get("http://127.0.0.1:8000/users/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setProfile(res.data);
+    } catch {
+      setProfile(null);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
-        try {
-          const token = await user.getIdToken();
-          const res = await axios.get("http://127.0.0.1:8000/users/me", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          setProfile(res.data);
-        } catch {
-          setProfile(null);
-        }
+        await fetchProfile(user);
       } else {
         setProfile(null);
       }
@@ -31,7 +35,13 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  const value = { currentUser, profile, loading };
+  const refreshProfile = async () => {
+    if (auth.currentUser) {
+      await fetchProfile(auth.currentUser);
+    }
+  };
+
+  const value = { currentUser, profile, loading, refreshProfile };
 
   return (
     <AuthContext.Provider value={value}>

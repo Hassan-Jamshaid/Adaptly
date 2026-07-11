@@ -7,6 +7,7 @@ import HRDashboard from "./pages/HRDashboard";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import PublicRoute from "./routes/PublicRoute";
 import UploadContent from "./pages/UploadContent";
+import AccessibilitySettings from "./pages/AccessibilitySettings";
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <ProtectedRoute allowedMode="corporate" allowedRole="hr_admin"><HRDashboard /></ProtectedRoute>
       } />
       <Route path="/upload" element={<ProtectedRoute><UploadContent /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><AccessibilitySettings /></ProtectedRoute>} />
     </Routes>
   );
 }

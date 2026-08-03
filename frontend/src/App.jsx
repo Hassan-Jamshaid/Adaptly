@@ -8,10 +8,12 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import PublicRoute from "./routes/PublicRoute";
 import UploadContent from "./pages/UploadContent";
 import AccessibilitySettings from "./pages/AccessibilitySettings";
+import StudySession from "./pages/StudySession";
 
 function App() {
   return (
     <Routes>
+      <Route path="/session" element={<ProtectedRoute><StudySession /></ProtectedRoute>} />
       <Route path="/" element={<Navigate to="/login" />} />
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />

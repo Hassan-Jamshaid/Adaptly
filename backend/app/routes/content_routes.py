@@ -154,3 +154,39 @@ async def upload_video(file: UploadFile = File(...), user=Depends(get_current_us
     doc = build_content_doc(user["uid"], "video", file.filename, chunks, source=file.filename)
     result = db.content.insert_one(doc)
     return {"content_id": str(result.inserted_id), "chunk_count": len(chunks)}
+
+
+
+
+
+
+
+
+
+from app.services.research_paper_processing import process_research_paper
+
+
+@router.post("/upload-research-paper")
+async def upload_research_paper(file: UploadFile = File(...), user=Depends(get_current_user)):
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+
+    contents = await file.read()
+    result = process_research_paper(contents)
+
+    if not result["body_text"].strip():
+        raise HTTPException(status_code=422, detail="Could not extract text from research paper")
+
+    full_text = result["body_text"]
+    if result["abstract"]:
+        full_text = f"Abstract: {result['abstract']}\n\n{full_text}"
+
+    chunks = chunk_text(full_text)
+    doc = build_content_doc(user["uid"], "research_paper", file.filename, chunks, source=file.filename)
+    result_id = db.content.insert_one(doc)
+
+    return {
+        "content_id": str(result_id.inserted_id),
+        "chunk_count": len(chunks),
+        "abstract_detected": result["abstract"] is not None,
+    }

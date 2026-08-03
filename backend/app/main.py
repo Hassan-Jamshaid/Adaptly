@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.dependencies import get_current_user
 from app.routes.user_routes import router as user_router
 from app.routes.content_routes import router as content_router
+from app.routes.engagement_routes import router as engagement_router
 
 app = FastAPI(title="Adaptly API")
 
@@ -16,6 +17,7 @@ app.add_middleware(
 
 app.include_router(user_router)
 app.include_router(content_router)
+app.include_router(engagement_router)
 
 @app.get("/health")
 def health_check():

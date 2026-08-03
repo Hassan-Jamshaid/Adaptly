@@ -10,3 +10,6 @@ requests
 python-multipart
 youtube-transcript-api
 openai
+tensorflow
+scikit-learn
+pymupdf

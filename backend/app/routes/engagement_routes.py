@@ -1,0 +1,74 @@
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from typing import List, Optional
+from app.core.dependencies import get_current_user
+from app.core.db import db
+from app.ml.engagement_model import predict_engagement
+from app.ml.feature_extraction import extract_9_features
+from app.ml.calibration import compute_user_baseline, compute_offset, apply_calibration
+
+router = APIRouter(prefix="/engagement", tags=["engagement"])
+
+
+class FrameData(BaseModel):
+    landmarks: Optional[List[List[float]]] = None
+
+
+class CalibrateRequest(BaseModel):
+    frames: List[FrameData]
+
+
+class EngagementAnalyzeRequest(BaseModel):
+    frames: List[FrameData]
+
+
+def extract_feature_sequence(frames: List[FrameData]) -> list:
+    feature_sequence = []
+    last_valid = None
+    for frame in frames:
+        feats = extract_9_features(frame.landmarks)
+        if feats is not None:
+            last_valid = feats
+            feature_sequence.append(feats)
+        elif last_valid is not None:
+            feature_sequence.append(last_valid)
+        else:
+            feature_sequence.append(None)
+    return feature_sequence
+
+
+@router.post("/calibrate")
+def calibrate(payload: CalibrateRequest, user=Depends(get_current_user)):
+    feature_sequence = extract_feature_sequence(payload.frames)
+    baseline = compute_user_baseline(feature_sequence)
+
+    if baseline is None:
+        raise HTTPException(status_code=422, detail="No face detected during calibration")
+
+    offset = compute_offset(baseline)
+
+    db.calibration.update_one(
+        {"uid": user["uid"]},
+        {"$set": {"offset": offset}},
+        upsert=True,
+    )
+
+    return {"message": "Calibration complete", "offset": offset}
+
+
+@router.post("/analyze")
+def analyze_engagement(payload: EngagementAnalyzeRequest, user=Depends(get_current_user)):
+    if len(payload.frames) != 10:
+        raise HTTPException(status_code=400, detail="Exactly 10 frames are required")
+
+    feature_sequence = extract_feature_sequence(payload.frames)
+
+    # replace any remaining None frames (no face detected at all yet) with zeros
+    feature_sequence = [f if f is not None else [0.0] * 9 for f in feature_sequence]
+
+    calibration_doc = db.calibration.find_one({"uid": user["uid"]})
+    if calibration_doc:
+        feature_sequence = apply_calibration(feature_sequence, calibration_doc["offset"])
+
+    result = predict_engagement(feature_sequence)
+    return result

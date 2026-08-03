@@ -89,6 +89,20 @@ export default function UploadContent() {
     }
   };
 
+  const handlePaperUpload = async (e) => {
+    e.preventDefault();
+    setStatus("Processing...");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const headers = await getAuthHeader();
+      const res = await axios.post("http://127.0.0.1:8000/content/upload-research-paper", formData, { headers });
+      setStatus(`Success — ${res.data.chunk_count} chunks. Abstract detected: ${res.data.abstract_detected}`);
+    } catch (err) {
+      setStatus(err.response?.data?.detail || "Upload failed");
+    }
+  };
+
   const tabButtonStyle = (name) => ({
     marginRight: "0.5rem",
     fontWeight: tab === name ? "bold" : "normal",
@@ -97,12 +111,14 @@ export default function UploadContent() {
 
   return (
     <DashboardLayout title="Upload Content">
+      <button onClick={async () => console.log(await auth.currentUser.getIdToken())}>Show Token</button>
       <div style={{ marginBottom: "1rem" }}>
         <button style={tabButtonStyle("pdf")} onClick={() => setTab("pdf")}>PDF</button>
         <button style={tabButtonStyle("text")} onClick={() => setTab("text")}>Paste Text</button>
         <button style={tabButtonStyle("url")} onClick={() => setTab("url")}>Website URL</button>
         <button style={tabButtonStyle("youtube")} onClick={() => setTab("youtube")}>YouTube</button>
         <button style={tabButtonStyle("video")} onClick={() => setTab("video")}>Upload Video</button>
+        <button style={tabButtonStyle("paper")} onClick={() => setTab("paper")}>Research Paper</button>
       </div>
 
       {tab === "pdf" && (
@@ -146,6 +162,13 @@ export default function UploadContent() {
             Note: video transcription requires backend configuration and may not be active yet.
           </p>
         </form>
+      )}
+
+      {tab === "paper" && (
+        <form onSubmit={handlePaperUpload}>
+          <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files[0])} required />
+          <button type="submit" style={{ marginLeft: "0.5rem" }}>Upload Research Paper</button>
+         </form>
       )}
 
       {status && <p style={{ marginTop: "1rem" }}>{status}</p>}

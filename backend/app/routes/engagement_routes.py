@@ -6,6 +6,7 @@ from app.core.db import db
 from app.ml.engagement_model import predict_engagement
 from app.ml.feature_extraction import extract_9_features
 from app.ml.calibration import compute_user_baseline, compute_offset, apply_calibration
+from app.ml import smoothing, fatigue, recovery, deep_thinking
 
 router = APIRouter(prefix="/engagement", tags=["engagement"])
 
@@ -20,6 +21,10 @@ class CalibrateRequest(BaseModel):
 
 class EngagementAnalyzeRequest(BaseModel):
     frames: List[FrameData]
+    # Optional: when present, predictions are smoothed across consecutive
+    # windows for this session. When absent the raw prediction is returned,
+    # exactly as before smoothing existed.
+    session_id: Optional[str] = None
 
 
 def extract_feature_sequence(frames: List[FrameData]) -> list:
@@ -71,4 +76,35 @@ def analyze_engagement(payload: EngagementAnalyzeRequest, user=Depends(get_curre
         feature_sequence = apply_calibration(feature_sequence, calibration_doc["offset"])
 
     result = predict_engagement(feature_sequence)
-    return result
+
+    if not payload.session_id:
+        return result  # unchanged legacy response when no session_id is sent
+
+    response = smoothing.update(
+        user["uid"], payload.session_id, result["state"], result["confidence"]
+    )
+    response.update(
+        fatigue.update(
+            user["uid"],
+            payload.session_id,
+            feature_sequence,
+            calibrated=calibration_doc is not None,
+        )
+    )
+    dt = deep_thinking.update(
+        user["uid"],
+        payload.session_id,
+        feature_sequence,
+        response["state"],
+        calibrated=calibration_doc is not None,
+    )
+    response.update(dt)
+
+    # Recovery sees the EFFECTIVE state, so windows judged to be reflection are
+    # not counted as a dip the learner later "recovers" from — they never
+    # disengaged in the first place.
+    effective_state = "Deep Thinking" if dt["deep_thinking"] else response["state"]
+
+    # fed the smoothed state, so noisy single-window flips can't fake a recovery
+    response.update(recovery.update(user["uid"], payload.session_id, effective_state))
+    return response

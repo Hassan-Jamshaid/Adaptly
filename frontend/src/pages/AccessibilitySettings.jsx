@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
-import { auth } from "../firebase/config";
+import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import DashboardLayout from "../layouts/DashboardLayout";
 
@@ -23,12 +22,9 @@ export default function AccessibilitySettings() {
     e.preventDefault();
     setStatus("Saving...");
     try {
-      const token = await auth.currentUser.getIdToken();
-      await axios.put(
-        "http://127.0.0.1:8000/users/me",
-        { accessibility_settings: { font_size: fontSize, contrast: contrast, font_family: fontFamily } },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.put("/users/me", {
+        accessibility_settings: { font_size: fontSize, contrast: contrast, font_family: fontFamily },
+      });
       await refreshProfile();
       setStatus("Saved and applied.");
     } catch (err) {

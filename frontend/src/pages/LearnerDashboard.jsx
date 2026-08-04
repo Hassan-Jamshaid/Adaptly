@@ -1,19 +1,22 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
-import { auth } from "../firebase/config";
+import api from "../api/client";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { Link } from "react-router-dom";
 
 export default function LearnerDashboard() {
   const [content, setContent] = useState([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchContent = async () => {
-      const token = await auth.currentUser.getIdToken();
-      const res = await axios.get("http://127.0.0.1:8000/content/list", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setContent(res.data);
+      try {
+        const res = await api.get("/content/list");
+        setContent(res.data);
+      } catch (err) {
+        // previously this threw into an unhandled promise rejection and the
+        // list just silently stayed empty
+        setError(err.response?.data?.detail || "Could not load your content.");
+      }
     };
     fetchContent();
   }, []);
@@ -21,6 +24,7 @@ export default function LearnerDashboard() {
   return (
     <DashboardLayout title="Learner Dashboard">
       <Link to="/upload">+ Upload New Content</Link>
+      {error && <p style={{ color: "red" }}>{error}</p>}
       <ul style={{ marginTop: "1rem" }}>
         {content.map((item) => (
           <li key={item._id}>

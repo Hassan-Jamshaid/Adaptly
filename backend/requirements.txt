@@ -12,4 +12,4 @@ youtube-transcript-api
 openai
 tensorflow
 scikit-learn
-pymupdf
+pymupdfopencv-python-headless

@@ -1,43 +1,41 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "../firebase/config";
-import axios from "axios";
 
 export default function Login() {
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const routeByBackendProfile = async () => {
-    const token = await auth.currentUser.getIdToken();
-    const res = await axios.get("http://127.0.0.1:8000/users/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const { mode, corporate_role } = res.data;
-    if (mode === "corporate") navigate(corporate_role === "hr_admin" ? "/hr" : "/employee");
-    else navigate("/learner");
-  };
+  // No profile fetch or navigation here on purpose. Signing in updates
+  // AuthContext, and PublicRoute then redirects: to the right dashboard if a
+  // profile exists, or to /register if this account has never registered.
+  // The old version fetched /users/me itself and surfaced the 404 for a
+  // first-time Google user as a raw error, stranding them on this page.
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setBusy(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      await routeByBackendProfile();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setBusy(false);
     }
   };
 
   const handleGoogleLogin = async () => {
     setError("");
+    setBusy(true);
     try {
       await signInWithPopup(auth, googleProvider);
-      await routeByBackendProfile();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -49,9 +47,11 @@ export default function Login() {
           style={{ display: "block", width: "100%", marginBottom: "0.5rem", padding: "0.5rem" }} />
         <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required
           style={{ display: "block", width: "100%", marginBottom: "0.5rem", padding: "0.5rem" }} />
-        <button type="submit" style={{ width: "100%", padding: "0.6rem" }}>Login</button>
+        <button type="submit" disabled={busy} style={{ width: "100%", padding: "0.6rem" }}>
+          {busy ? "Signing in..." : "Login"}
+        </button>
       </form>
-      <button onClick={handleGoogleLogin} style={{ width: "100%", padding: "0.6rem", marginTop: "0.5rem" }}>
+      <button onClick={handleGoogleLogin} disabled={busy} style={{ width: "100%", padding: "0.6rem", marginTop: "0.5rem" }}>
         Sign in with Google
       </button>
       {error && <p style={{ color: "red" }}>{error}</p>}

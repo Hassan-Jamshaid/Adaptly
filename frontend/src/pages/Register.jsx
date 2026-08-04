@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "../firebase/config";
 import { useAuth } from "../context/AuthContext";
-import axios from "axios";
+import api from "../api/client";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -21,12 +21,16 @@ export default function Register() {
   };
 
   const saveProfileToBackend = async () => {
-    const token = await auth.currentUser.getIdToken();
-    await axios.post(
-      `http://127.0.0.1:8000/users/register?mode=${mode}${mode === "corporate" ? `&role=${role}` : ""}`,
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    try {
+      await api.post("/users/register", {}, {
+        params: mode === "corporate" ? { mode, role } : { mode },
+      });
+    } catch (err) {
+      // 400 here means a profile already exists for this account. That is not
+      // a failure from the user's point of view — refreshing the profile below
+      // will pick it up and route them onward.
+      if (err.response?.status !== 400) throw err;
+    }
     await refreshProfile();
   };
 

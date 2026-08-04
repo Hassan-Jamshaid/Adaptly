@@ -1,6 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
-import { auth } from "../firebase/config";
+import api from "../api/client";
 import DashboardLayout from "../layouts/DashboardLayout";
 
 export default function UploadContent() {
@@ -13,94 +12,73 @@ export default function UploadContent() {
   const [videoFile, setVideoFile] = useState(null);
   const [status, setStatus] = useState("");
 
-  const getAuthHeader = async () => {
-    const token = await auth.currentUser.getIdToken();
-    return { Authorization: `Bearer ${token}` };
-  };
-
-  const handlePdfUpload = async (e) => {
-    e.preventDefault();
-    setStatus("Uploading...");
+  /**
+   * All six uploads follow the same shape, so they share one helper rather
+   * than repeating the token/URL/error handling six times.
+   * `config` allows per-call overrides — video transcription disables the
+   * client timeout because it legitimately runs for minutes.
+   */
+  const submitUpload = async (endpoint, fields, messages, config = {}) => {
+    setStatus(messages.pending);
     try {
       const formData = new FormData();
-      formData.append("file", file);
-      const headers = await getAuthHeader();
-      const res = await axios.post("http://127.0.0.1:8000/content/upload-pdf", formData, { headers });
-      setStatus(`Success — ${res.data.chunk_count} chunks created.`);
+      for (const [key, value] of Object.entries(fields)) {
+        formData.append(key, value);
+      }
+      const res = await api.post(endpoint, formData, config);
+      setStatus(messages.success(res.data));
     } catch (err) {
-      setStatus(err.response?.data?.detail || "Upload failed");
+      setStatus(err.response?.data?.detail || messages.failure);
     }
   };
 
-  const handleTextUpload = async (e) => {
+  const chunkMessage = (data) => `Success — ${data.chunk_count} chunks created.`;
+
+  const handlePdfUpload = (e) => {
     e.preventDefault();
-    setStatus("Processing...");
-    try {
-      const formData = new FormData();
-      formData.append("title", title);
-      formData.append("text", text);
-      const headers = await getAuthHeader();
-      const res = await axios.post("http://127.0.0.1:8000/content/paste-text", formData, { headers });
-      setStatus(`Success — ${res.data.chunk_count} chunks created.`);
-    } catch (err) {
-      setStatus(err.response?.data?.detail || "Processing failed");
-    }
+    return submitUpload("/content/upload-pdf", { file }, {
+      pending: "Uploading...", success: chunkMessage, failure: "Upload failed",
+    });
   };
 
-  const handleUrlUpload = async (e) => {
+  const handleTextUpload = (e) => {
     e.preventDefault();
-    setStatus("Fetching URL...");
-    try {
-      const formData = new FormData();
-      formData.append("url", url);
-      const headers = await getAuthHeader();
-      const res = await axios.post("http://127.0.0.1:8000/content/from-url", formData, { headers });
-      setStatus(`Success — ${res.data.chunk_count} chunks created.`);
-    } catch (err) {
-      setStatus(err.response?.data?.detail || "Fetch failed");
-    }
+    return submitUpload("/content/paste-text", { title, text }, {
+      pending: "Processing...", success: chunkMessage, failure: "Processing failed",
+    });
   };
 
-  const handleYoutubeUpload = async (e) => {
+  const handleUrlUpload = (e) => {
     e.preventDefault();
-    setStatus("Fetching transcript...");
-    try {
-      const formData = new FormData();
-      formData.append("url", youtubeUrl);
-      const headers = await getAuthHeader();
-      const res = await axios.post("http://127.0.0.1:8000/content/from-youtube", formData, { headers });
-      setStatus(`Success — ${res.data.chunk_count} chunks created.`);
-    } catch (err) {
-      setStatus(err.response?.data?.detail || "Transcript fetch failed");
-    }
+    return submitUpload("/content/from-url", { url }, {
+      pending: "Fetching URL...", success: chunkMessage, failure: "Fetch failed",
+    });
   };
 
-  const handleVideoUpload = async (e) => {
+  const handleYoutubeUpload = (e) => {
     e.preventDefault();
-    setStatus("Uploading and transcribing... this may take a while.");
-    try {
-      const formData = new FormData();
-      formData.append("file", videoFile);
-      const headers = await getAuthHeader();
-      const res = await axios.post("http://127.0.0.1:8000/content/upload-video", formData, { headers });
-      setStatus(`Success — ${res.data.chunk_count} chunks created.`);
-    } catch (err) {
-      setStatus(err.response?.data?.detail || "Video transcription failed");
-    }
+    return submitUpload("/content/from-youtube", { url: youtubeUrl }, {
+      pending: "Fetching transcript...", success: chunkMessage, failure: "Transcript fetch failed",
+    });
   };
 
-  const handlePaperUpload = async (e) => {
+  const handleVideoUpload = (e) => {
     e.preventDefault();
-    setStatus("Processing...");
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const headers = await getAuthHeader();
-      const res = await axios.post("http://127.0.0.1:8000/content/upload-research-paper", formData, { headers });
-      setStatus(`Success — ${res.data.chunk_count} chunks. Abstract detected: ${res.data.abstract_detected}`);
-    } catch (err) {
-      setStatus(err.response?.data?.detail || "Upload failed");
-    }
+    return submitUpload("/content/upload-video", { file: videoFile }, {
+      pending: "Uploading and transcribing... this may take a while.",
+      success: chunkMessage,
+      failure: "Video transcription failed",
+    }, { timeout: 0 }); // transcription can far exceed the default timeout
+  };
+
+  const handlePaperUpload = (e) => {
+    e.preventDefault();
+    return submitUpload("/content/upload-research-paper", { file }, {
+      pending: "Processing...",
+      success: (data) =>
+        `Success — ${data.chunk_count} chunks. Abstract detected: ${data.abstract_detected}`,
+      failure: "Upload failed",
+    });
   };
 
   const tabButtonStyle = (name) => ({
@@ -111,7 +89,6 @@ export default function UploadContent() {
 
   return (
     <DashboardLayout title="Upload Content">
-      <button onClick={async () => console.log(await auth.currentUser.getIdToken())}>Show Token</button>
       <div style={{ marginBottom: "1rem" }}>
         <button style={tabButtonStyle("pdf")} onClick={() => setTab("pdf")}>PDF</button>
         <button style={tabButtonStyle("text")} onClick={() => setTab("text")}>Paste Text</button>

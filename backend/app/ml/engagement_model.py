@@ -1,7 +1,12 @@
 import os
 import pickle
 import numpy as np
-import tensorflow as tf
+
+# TensorFlow is deliberately NOT imported at module level. Importing it takes
+# ~15-20 seconds, and because this module is reachable from main.py, that delay
+# ran before uvicorn began accepting connections — so a browser opened during
+# startup got connection-refused and the app stalled on "Loading profile...".
+# The import now happens on the first prediction instead.
 
 ML_DIR = os.path.dirname(__file__)
 
@@ -14,6 +19,8 @@ STATE_LABELS = {0: "Focused", 1: "Drifting", 2: "Struggling"}
 def load_engagement_model():
     global _model, _scaler
     if _model is None:
+        import tensorflow as tf  # deferred — see note at top of file
+
         _model = tf.keras.models.load_model(os.path.join(ML_DIR, "best_model_9f.keras"))
     if _scaler is None:
         with open(os.path.join(ML_DIR, "scaler_9f.pkl"), "rb") as f:

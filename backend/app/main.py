@@ -9,7 +9,12 @@ app = FastAPI(title="Adaptly API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    # Vite silently moves to the next free port (5174, 5175, ...) whenever 5173
+    # is already taken, and the browser treats localhost and 127.0.0.1 as
+    # different origins. Pinning one exact origin meant any of those situations
+    # broke every API call with an opaque "Network Error".
+    # TIGHTEN THIS to the real deployed origin before going to production.
+    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1):\d+$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

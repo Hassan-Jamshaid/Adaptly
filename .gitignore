@@ -19,3 +19,6 @@ backend/app/core/firebase-service-account.json
 # OS/editor
 .DS_Store
 .vscode/
+
+# Internal working notes, kept local
+PROJECT_CONTEXT.md

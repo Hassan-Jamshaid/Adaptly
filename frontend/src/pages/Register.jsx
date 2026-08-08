@@ -72,16 +72,16 @@ export default function Register() {
         </label>
       </div>
 
+      {/* HR Admin is deliberately NOT offered here. It grants access to other
+          employees' records, so it must be granted rather than requested — the
+          backend rejects it at registration. An existing HR administrator
+          assigns it via PUT /users/{uid}/corporate-role. */}
       {mode === "corporate" && (
         <div style={{ marginBottom: "1rem" }}>
-          <label>
-            <input type="radio" checked={role === "employee"} onChange={() => setRole("employee")} />
-            Employee
-          </label>
-          <label style={{ marginLeft: "1rem" }}>
-            <input type="radio" checked={role === "hr_admin"} onChange={() => setRole("hr_admin")} />
-            HR Admin
-          </label>
+          <p style={{ margin: "0 0 0.5rem", fontSize: "0.9rem", color: "#555" }}>
+            Corporate accounts register as an Employee. HR administrator access is
+            granted by an existing administrator.
+          </p>
         </div>
       )}
 

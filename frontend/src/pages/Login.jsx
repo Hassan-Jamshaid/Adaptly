@@ -1,11 +1,16 @@
 import { useState } from "react";
-import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import {
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+} from "firebase/auth";
 import { auth, googleProvider } from "../firebase/config";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
   // No profile fetch or navigation here on purpose. Signing in updates
@@ -29,11 +34,39 @@ export default function Login() {
 
   const handleGoogleLogin = async () => {
     setError("");
+    setNotice("");
     setBusy(true);
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    setError("");
+    setNotice("");
+    if (!email) {
+      setError("Enter your email address first, then click Forgot password.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      // Deliberately the same message whether or not the account exists —
+      // a different reply would let anyone test which emails are registered.
+      setNotice(`If an account exists for ${email}, a reset link has been sent. Check spam too.`);
+    } catch (err) {
+      // Firebase reports a non-existent account here; don't leak that either.
+      if (err?.code === "auth/user-not-found") {
+        setNotice(`If an account exists for ${email}, a reset link has been sent. Check spam too.`);
+      } else if (err?.code === "auth/invalid-email") {
+        setError("That email address doesn't look valid.");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setBusy(false);
     }
@@ -54,6 +87,24 @@ export default function Login() {
       <button onClick={handleGoogleLogin} disabled={busy} style={{ width: "100%", padding: "0.6rem", marginTop: "0.5rem" }}>
         Sign in with Google
       </button>
+      <button
+        type="button"
+        onClick={handlePasswordReset}
+        disabled={busy}
+        style={{
+          width: "100%",
+          padding: "0.4rem",
+          marginTop: "0.5rem",
+          background: "none",
+          border: "none",
+          textDecoration: "underline",
+          cursor: "pointer",
+          fontSize: "0.9rem",
+        }}
+      >
+        Forgot password?
+      </button>
+      {notice && <p style={{ color: "green" }}>{notice}</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
     </div>
   );

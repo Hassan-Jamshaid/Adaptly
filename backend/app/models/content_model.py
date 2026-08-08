@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 def build_content_doc(uid: str, content_type: str, title: str, chunks: list, source: str = None):
     return {
@@ -8,5 +8,5 @@ def build_content_doc(uid: str, content_type: str, title: str, chunks: list, sou
         "source": source,       # filename or URL, if applicable
         "chunks": chunks,       # list of { "chunk_id": int, "text": str }
         "status": "ready",
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
     }

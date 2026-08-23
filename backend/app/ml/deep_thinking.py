@@ -59,10 +59,14 @@ GAZE_VARIANCE_MAX = 5e-6   # measured 1.40e-6 when still — original guess held
 EAR_VARIANCE_MAX = 2e-3    # was 1e-4, which measured ~8x too strict to ever pass
 PITCH_DOWN_DELTA = 4.0     # head down => pitch delta POSITIVE (measured +7.39);
                            # the original -3.0 had the sign backwards
-# Preferred gate when a solvePnP pose baseline exists. Note the OPPOSITE sign:
-# solvePnP pitch goes NEGATIVE looking down (verified against synthetic ground
-# truth), whereas the simplified estimate goes positive.
-PITCH_DOWN_DEGREES = -8.0
+# Preferred gate when a solvePnP pose baseline exists. SAME sign as the
+# simplified estimate: head down => POSITIVE. Measured live at +7 degrees while
+# looking at a keyboard.
+#
+# An earlier version used -8.0 on the strength of a synthetic test that built
+# its own rotation and then measured it — so it confirmed the assumption it was
+# written from rather than describing a real camera. Live readings overrule it.
+PITCH_DOWN_DEGREES = 4.0
 # ------------------------------------------------------------------------------
 
 SESSION_TTL_SECONDS = 1800
@@ -148,7 +152,7 @@ def update(uid: str, session_id: str, feature_sequence: list,
     gaze_ok = gaze_var <= GAZE_VARIANCE_MAX
     ear_ok = ear_var <= EAR_VARIANCE_MAX
     if pose_pitch_delta is not None:
-        pitch_ok = pose_pitch_delta <= PITCH_DOWN_DEGREES
+        pitch_ok = pose_pitch_delta >= PITCH_DOWN_DEGREES
     else:
         pitch_ok = pitch_delta >= PITCH_DOWN_DELTA
     state_ok = display_state in BAD_STATES

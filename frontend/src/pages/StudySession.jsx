@@ -505,6 +505,48 @@ export default function StudySession() {
         </div>
         {calibrationError && <p style={{ color: "red" }}>Calibration failed: {calibrationError}</p>}
 
+        {/* Placeholder shown until the first prediction arrives, so the panel is
+            never blank. Two waits happen before a state can appear:
+              1. the 10-frame buffer filling at 1 frame/sec (~10s), and
+              2. the very first prediction, which loads TensorFlow (~13s cold).
+            The backend now warms the model on startup, so (2) is usually gone by
+            the time a user reaches this screen — but the message covers it. */}
+        {!prediction && (
+          <div style={{ margin: "0.75rem 0", minHeight: "3.5rem" }}>
+            <p style={{ fontSize: "1.1rem", margin: "0.25rem 0", color: "#666" }}>
+              <strong>
+                {framesCollected < 10
+                  ? `Getting ready — ${10 - framesCollected}s`
+                  : "Analysing your first reading..."}
+              </strong>
+            </p>
+            <p style={{ fontSize: "0.85rem", color: "#888", margin: 0 }}>
+              {framesCollected < 10
+                ? `Collecting camera readings (${framesCollected} of 10). Your engagement state appears once these are gathered.`
+                : "First reading takes a few seconds while the model loads. After this, updates are instant."}
+            </p>
+            <div
+              style={{
+                height: "4px",
+                width: "260px",
+                margin: "0.6rem auto 0",
+                background: "#e0e0e0",
+                borderRadius: "2px",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${Math.min(100, (framesCollected / 10) * 100)}%`,
+                  background: "#0b6bcb",
+                  transition: "width .4s ease",
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {prediction && (
           <>
             <p style={{ fontSize: "1.1rem", margin: "0.5rem 0" }}>

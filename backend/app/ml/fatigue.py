@@ -61,12 +61,28 @@ EYE_OPENNESS_INDEX = 6
 HEAD_DOWN_DELTA = 3.0
 
 # Preferred gate: solvePnP pitch relative to the user's calibrated pose baseline.
-# Verified against synthetic ground truth — looking down makes solvePnP pitch
-# NEGATIVE, the OPPOSITE of the simplified estimate above. Distance-invariant and
-# much less contaminated by jaw movement (~35% of a head-down signal vs ~68%).
-# Used when a pose baseline exists; otherwise the simplified gate above applies,
-# so users calibrated before solvePnP was added keep working until they recalibrate.
-HEAD_DOWN_DEGREES = -8.0
+# Distance-invariant and much less contaminated by jaw movement than the
+# simplified estimate. Used when a pose baseline exists; otherwise the simplified
+# gate above applies, so users calibrated before solvePnP was added keep working
+# until they recalibrate.
+#
+# MEASURED FROM A REAL SESSION, and this sign was wrong twice before.
+#
+# Live reading while typing and looking at a keyboard: solvePnP pitch delta
+# = +7 degrees. So head down => POSITIVE, the same direction as the simplified
+# estimate, not the opposite.
+#
+# An earlier version used -8.0 because a synthetic test appeared to show head
+# down going negative. That test built its own rotation and then measured it,
+# so it only confirmed the assumption it was written from — it never described
+# what a real camera and a real face produce. The gate could therefore never
+# fire, and fatigue kept accumulating while the user was actively typing.
+# Trust the live number over the synthetic one.
+#
+# Threshold set below the measured +7 so an ordinary glance down still trips it,
+# while normal sitting (near 0, since this is relative to the user's own
+# calibrated baseline) does not.
+HEAD_DOWN_DEGREES = 4.0
 
 # A gaze-direction gate was tried here too, on the theory that looking at a
 # keyboard is done with the eyes more than the head. Measured gaze delta with
@@ -159,7 +175,7 @@ def update(uid: str, session_id: str, feature_sequence: list, calibrated: bool,
     gaze_delta = _median([frame[GAZE_Y_INDEX] for frame in feature_sequence]) - get_reference_gaze_y()
 
     if pose_pitch_delta is not None:
-        head_down = pose_pitch_delta <= HEAD_DOWN_DEGREES
+        head_down = pose_pitch_delta >= HEAD_DOWN_DEGREES
     else:
         head_down = pitch_delta >= HEAD_DOWN_DELTA
 

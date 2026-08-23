@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.authorization import get_current_profile, require_hr_admin
@@ -66,7 +68,12 @@ def update_profile(payload: dict, user=Depends(get_current_user)):
         )
 
     result = db.users.update_one(
-        {"uid": user["uid"]}, {"$set": {"accessibility_settings": cleaned}}
+        {"uid": user["uid"]},
+        {"$set": {
+            "accessibility_settings": cleaned,
+            # kept current so the shared contract's updated_at is meaningful
+            "updated_at": datetime.now(timezone.utc),
+        }},
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Profile not found")

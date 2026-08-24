@@ -22,3 +22,4 @@ backend/app/core/firebase-service-account.json
 
 # Internal working notes, kept local
 PROJECT_CONTEXT.md
+SESSION_HANDOFF.md
